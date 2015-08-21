@@ -974,9 +974,13 @@ static int restore_cgroup_prop(const CgroupPropEntry * cg_prop_entry_p,
 		return -1;
 	}
 
+	if (fflush(f) != 0) {
+		pr_perror("Failed to flush %s", path);
+	}
+
 	if (fclose(f) != 0) {
 		pr_perror("Failed closing %s", path);
-		return -1;
+		/* return -1; */
 	}
 
 	pr_info("Restored cgroup property value %s to %s\n", cg_prop_entry_p->value, path);
