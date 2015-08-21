@@ -950,6 +950,8 @@ static int restore_cgroup_prop(const CgroupPropEntry * cg_prop_entry_p,
 {
 	FILE *f;
 	int cg;
+	int flushcounter=0;
+	int maxtries=500;
 
 	if (!cg_prop_entry_p->value) {
 		pr_err("cg_prop_entry->value was empty when should have had a value");
@@ -974,25 +976,26 @@ static int restore_cgroup_prop(const CgroupPropEntry * cg_prop_entry_p,
 		return -1;
 	}
 
-	int dumbcounter=0;
-	int maxtries=50000;
+	/* The fclose() below was failing intermittently with EINVAL at AWS*/
+	/* So we try fflush() in a loop until it succeeds or we've */
+	/* tried it a bunch. */
 	for (;;) {
-		dumbcounter++;
+		flushcounter++;
 		if (fflush(f) == 0) {
 			break;
 		}
-		if (dumbcounter > maxtries) {
-			pr_perror("Max tries %d exceeded.  Moving along anyway.\n",maxtries);
+		if (flushcounter > maxtries) {
+			pr_perror("Max fflush() tries %d exceeded.  Moving along anyway.\n",maxtries);
 			break;
 		}
 		if (fflush(f) != 0) {
-			pr_perror("Failed to flush %d/%d %s\n", dumbcounter,maxtries,path);
+		  pr_perror("Failed to flush %s [%d/%d]\n", path, flushcounter,maxtries);
 		}
 	}
 
 	if (fclose(f) != 0) {
-		pr_perror("Failed closing %s; moving ahead and leaking a filehandle.\n", path);
-		/* return -1; */
+	  pr_perror("Failed closing %s\n",path);
+	  return -1; 
 	}
 
 	pr_info("Restored cgroup property value %s to %s\n", cg_prop_entry_p->value, path);
