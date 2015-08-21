@@ -974,12 +974,24 @@ static int restore_cgroup_prop(const CgroupPropEntry * cg_prop_entry_p,
 		return -1;
 	}
 
-	if (fflush(f) != 0) {
-		pr_perror("Failed to flush %s", path);
+	int dumbcounter=0;
+	int maxtries=50000;
+	for (;;) {
+		dumbcounter++;
+		if (fflush(f) == 0) {
+			break;
+		}
+		if (dumbcounter > maxtries) {
+			pr_perror("Max tries %d exceeded.  Moving along anyway.\n",maxtries);
+			break;
+		}
+		if (fflush(f) != 0) {
+			pr_perror("Failed to flush %d/%d %s\n", dumbcounter,maxtries,path);
+		}
 	}
 
 	if (fclose(f) != 0) {
-		pr_perror("Failed closing %s", path);
+		pr_perror("Failed closing %s; moving ahead and leaking a filehandle.\n", path);
 		/* return -1; */
 	}
 
